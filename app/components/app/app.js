@@ -64,6 +64,7 @@ var AppComponent = React.createClass({
   contextTypes: {
     log: React.PropTypes.func.isRequired,
     api: React.PropTypes.object.isRequired,
+    patientStore: React.PropTypes.func.isRequired,
     router: React.PropTypes.object.isRequired,
     personUtils: React.PropTypes.object.isRequired,
     trackMetric: React.PropTypes.func.isRequired,
@@ -96,17 +97,11 @@ var AppComponent = React.createClass({
         bgPrefs.bgUnits = 'mmol/L';
       }
     }
-    return {
+    var initialState = {
       authenticated: this.context.api.user.isAuthenticated(),
       notification: null,
       page: null,
-      user: null,
-      fetchingUser: true,
       loggingOut: false,
-      patients: null,
-      fetchingPatients: true,
-      patient: null,
-      fetchingPatient: true,
       invites: null,
       fetchingInvites: true,
       pendingInvites:null,
@@ -125,6 +120,8 @@ var AppComponent = React.createClass({
       finalizingVerification: false,
       queryParams: queryParams
     };
+
+    return _.assign(initialState, this.context.patientStore.getState());
   },
 
   doOauthLogin:function(accessToken){
@@ -132,7 +129,7 @@ var AppComponent = React.createClass({
     self.context.api.user.oauthLogin(accessToken, function(err, data){
       if(_.isEmpty(err)){
         self.context.log('Logged in via OAuth');
-        self.fetchUser();
+        self.context.patientStore.fetchUser(self);
         self.setState({authenticated: true});
         self.context.trackMetric('Logged In with OAuth');
         //go to the specified patient if there is one
@@ -151,7 +148,7 @@ var AppComponent = React.createClass({
 
   componentDidMount: function() {
     if (this.state.authenticated) {
-      this.fetchUser();
+      this.context.patientStore.fetchUser(this);
     }
 
     this.setupAndStartRouter();
@@ -471,7 +468,7 @@ var AppComponent = React.createClass({
     this.renderPage = this.renderPatients;
     this.setState({page: 'patients'});
     this.fetchInvites();
-    this.fetchPatients();
+    this.context.patientStore.fetchPatients(this);
     this.context.trackMetric('Viewed Care Team List');
   },
   renderPatients: function() {
@@ -621,7 +618,7 @@ var AppComponent = React.createClass({
 
       }
 
-      self.fetchPatients();
+      self.context.patientStore.fetchPatients(self);
     });
   },
   handleRemoveMember: function(patientId, memberId, cb) {
@@ -883,7 +880,7 @@ var AppComponent = React.createClass({
 
   handleLoginSuccess: function() {
 
-    this.fetchUser();
+    this.context.patientStore.fetchUser(this);
     if( this.state.finalizingVerification ){
       this.setState({
         showingAcceptTerms: config.SHOW_ACCEPT_TERMS ? true : false,
@@ -984,24 +981,6 @@ var AppComponent = React.createClass({
     this.setState({notification: null});
   },
 
-  fetchUser: function() {
-    var self = this;
-
-    self.setState({fetchingUser: true});
-
-    self.context.api.user.get(function(err, user) {
-      if (err) {
-        self.setState({fetchingUser: false});
-        return self.handleApiError(err, usrMessages.ERR_FETCHING_USER, utils.buildExceptionDetails());
-      }
-
-      self.setState({
-        user: user,
-        fetchingUser: false
-      });
-    });
-  },
-
   fetchPendingInvites: function(cb) {
     var self = this;
 
@@ -1049,26 +1028,6 @@ var AppComponent = React.createClass({
       self.setState({
         invites: invites,
         fetchingInvites: false
-      });
-    });
-  },
-
-  fetchPatients: function(options) {
-    var self = this;
-
-    if(options && !options.hideLoading) {
-        self.setState({fetchingPatients: true});
-    }
-
-    self.context.api.patient.getAll(function(err, patients) {
-      if (err) {
-        self.setState({fetchingPatients: false});
-        return self.handleApiError(err, usrMessages.ERR_FETCHING_TEAMS, utils.buildExceptionDetails());
-      }
-
-      self.setState({
-        patients: patients,
-        fetchingPatients: false
       });
     });
   },

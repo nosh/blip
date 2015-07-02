@@ -25,6 +25,7 @@ describe('App', function () {
     log: sinon.stub(),
     api: mock.patchApi(api),
     personUtils: personUtils,
+    patientStore: sinon.stub(),
     router: router,
     DEBUG: false,
     trackMetric: sinon.stub()
