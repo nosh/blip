@@ -605,7 +605,7 @@ var AppComponent = React.createClass({
         return self.handleApiError(err, usrMessages.ERR_CHANGING_PERMS, utils.buildExceptionDetails());
       }
 
-      self.fetchPatient(patientId, cb);
+      self.context.patientStore.fetchPatient(self, patientId, cb);
     });
   },
   handleRemovePatient: function(patientId,cb) {
@@ -630,7 +630,7 @@ var AppComponent = React.createClass({
         return self.handleApiError(err, usrMessages.ERR_REMOVING_MEMBER ,utils.buildExceptionDetails());
       }
 
-      self.fetchPatient(patientId, cb);
+      self.context.patientStore.fetchPatient(self, patientId, cb);
     });
   },
   handleInviteMember: function(email, permissions, cb) {
@@ -689,7 +689,7 @@ var AppComponent = React.createClass({
       fetchingPatient: true
     });
     this.fetchPendingInvites();
-    this.fetchPatient(patientId,function(err,patient){
+    this.context.patientStore.fetchPatient(this, patientId,function(err,patient){
       return;
     });
     this.context.trackMetric('Viewed Profile');
@@ -705,7 +705,7 @@ var AppComponent = React.createClass({
       fetchingPatient: true
     });
     this.fetchPendingInvites();
-    this.fetchPatient(patientId,function(err,patient){
+    this.context.patientStore.fetchPatient(this, patientId,function(err,patient){
       return;
     });
     this.context.trackMetric('Viewed Share');
@@ -823,7 +823,7 @@ var AppComponent = React.createClass({
     });
 
     
-    self.fetchPatient(patientId, function(err, patient) {
+    self.context.patientStore.fetchPatient(self, patientId, function(err, patient) {
       self.fetchPatientData(patient);
     });
 
@@ -1029,34 +1029,6 @@ var AppComponent = React.createClass({
         invites: invites,
         fetchingInvites: false
       });
-    });
-  },
-
-  fetchPatient: function(patientId, callback) {
-    var self = this;
-
-    self.setState({fetchingPatient: true});
-
-    self.context.api.patient.get(patientId, function(err, patient) {
-      if (err) {
-        if (err.status === 404) {
-          self.context.log('Patient not found with id '+patientId);
-          var setupMsg = (patientId === self.state.user.userid) ? usrMessages.ERR_YOUR_ACCOUNT_NOT_CONFIGURED : usrMessages.ERR_ACCOUNT_NOT_CONFIGURED;
-          var dataStoreLink = (<a href="#/patients/new" onClick={self.closeNotification}>{usrMessages.YOUR_ACCOUNT_DATA_SETUP}</a>);
-          return self.handleActionableError(err, setupMsg, dataStoreLink);
-        }
-        // we can't deal with it so just show error handler
-        return self.handleApiError(err, usrMessages.ERR_FETCHING_PATIENT+patientId, utils.buildExceptionDetails());
-      }
-
-      self.setState({
-        patient: patient,
-        fetchingPatient: false
-      });
-
-      if (typeof callback === 'function') {
-        callback(null, patient);
-      }
     });
   },
 
