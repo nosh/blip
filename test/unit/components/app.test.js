@@ -21,11 +21,21 @@ describe('App', function () {
   // otherwise dependencies mocked will be bound to the wrong scope!
   var App = rewire('../../../app/components/app/app.js');
 
+  var patientStore = {
+    getState: sinon.stub().returns({
+      user: null,
+      fetchingUser: true,
+      patient: null,
+      patients: null,
+      fetchPatient: true,
+      fetchingPatients: true
+    })
+  };
   var context = {
     log: sinon.stub(),
     api: mock.patchApi(api),
     personUtils: personUtils,
-    patientStore: sinon.stub(),
+    patientStore: patientStore,
     router: router,
     DEBUG: false,
     trackMetric: sinon.stub()

@@ -93,7 +93,7 @@ var Bootstrap = React.createClass({
   childContextTypes: {
     log: React.PropTypes.func.isRequired,
     api: React.PropTypes.object.isRequired,
-    patientStore: React.PropTypes.func.isRequired,
+    patientStore: React.PropTypes.object.isRequired,
     router: React.PropTypes.object.isRequired,
     personUtils: React.PropTypes.object.isRequired,
     trackMetric: React.PropTypes.func.isRequired,
