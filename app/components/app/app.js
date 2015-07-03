@@ -19,14 +19,10 @@ var React = require('react');
 var async = require('async');
 var sundial = require('sundial');
 
-var nurseShark = require('tideline/plugins/nurseshark/');
-var TidelineData = require('tideline/js/tidelinedata');
-
 var config = require('../../config');
 var router = require('../../router');
 var routeMap = require('../../routemap');
 var personUtils = require('../../core/personutils');
-var queryString = require('../../core/querystring');
 var utils = require('../../core/utils');
 
 var usrMessages = require('../../userMessages');
@@ -72,41 +68,11 @@ var AppComponent = React.createClass({
     DEBUG: React.PropTypes.bool.isRequired
   },
   getInitialState: function() {
-    var queryParams = queryString.parseTypes(window.location.search);
-    var timePrefs = {
-      timezoneAware: false,
-      timezoneName: null
-    };
-    if (!_.isEmpty(queryParams.timezone)) {
-      var queryTimezone = queryParams.timezone.replace('-', '/');
-      try {
-        sundial.checkTimezoneName(queryTimezone);
-        timePrefs.timezoneAware = true;
-        timePrefs.timezoneName = queryTimezone;
-        this.context.log('Viewing data in timezone-aware mode with', queryTimezone, 'as the selected timezone.');
-      }
-      catch(err) {
-        this.context.log(new Error('Invalid timezone name in query parameter. (Try capitalizing properly.)'));
-      }
-    }
-    var bgPrefs = {
-      bgUnits: 'mg/dL'
-    };
-    if (!_.isEmpty(queryParams.units)) {
-      var queryUnits = queryParams.units.toLowerCase();
-      if (queryUnits === 'mmoll') {
-        bgPrefs.bgUnits = 'mmol/L';
-      }
-    }
     var initialState = {
       authenticated: this.context.api.user.isAuthenticated(),
       notification: null,
       page: null,
       loggingOut: false,
-      bgPrefs: bgPrefs,
-      timePrefs: timePrefs,
-      patientData: null,
-      fetchingPatientData: true,
       fetchingMessageData: true,
       showingAcceptTerms: false,
       showingWelcomeTitle: false,
@@ -115,7 +81,6 @@ var AppComponent = React.createClass({
       dismissedBrowserWarning: false,
       verificationEmailSent: false,
       finalizingVerification: false,
-      queryParams: queryParams
     };
 
     return _.assign(
@@ -825,7 +790,7 @@ var AppComponent = React.createClass({
 
     
     self.context.patientStore.fetchPatient(self, patientId, function(err, patient) {
-      self.fetchPatientData(patient);
+      self.context.patientStore.fetchPatientData(self, patient);
     });
 
     self.context.trackMetric('Viewed Data');
@@ -982,67 +947,6 @@ var AppComponent = React.createClass({
     this.setState({notification: null});
   },
 
-  fetchPatientData: function(patient) {
-    var self = this;
-
-    var patientId = patient.userid;
-
-    self.setState({fetchingPatientData: true});
-
-    var loadPatientData = function(cb) {
-      self.context.api.patientData.get(patientId, cb);
-    };
-
-    var loadTeamNotes = function(cb) {
-      self.context.api.team.getNotes(patientId, cb);
-    };
-
-    async.parallel({
-      patientData: loadPatientData,
-      teamNotes: loadTeamNotes
-    },
-    function(err, results) {
-      if (err) {
-        self.setState({fetchingPatientData: false});
-        // Patient with id not found, cary on
-        if (err.status === 404) {
-          self.context.log('No data found for patient '+patientId);
-          return;
-        }
-
-        return self.handleApiError(err, usrMessages.ERR_FETCHING_PATIENT_DATA+patientId, utils.buildExceptionDetails());
-      }
-
-      var patientData = results.patientData || [];
-      var notes = results.teamNotes || [];
-
-      self.context.log('Patient device data count', patientData.length);
-      self.context.log('Team notes count', notes.length);
-
-      var combinedData = patientData.concat(notes);
-      window.downloadInputData = function() {
-        console.save(combinedData, 'blip-input.json');
-      };
-      patientData = self.processPatientData(combinedData);
-      
-      // NOTE: intentional use of _.clone instead of _.cloneDeep
-      // we only need a shallow clone at the top level of the patientId keys
-      // and the _.cloneDeep I had originally would hang the browser for *seconds*
-      // when there was actually something in this.state.patientData
-      var allPatientsData = _.clone(self.state.patientData) || {};
-      allPatientsData[patientId] = patientData;
-
-      self.setState({
-        bgPrefs: {
-          bgClasses: patientData.bgClasses,
-          bgUnits: patientData.bgUnits
-        },
-        patientData: allPatientsData,
-        fetchingPatientData: false
-      });
-    });
-  },
-
   fetchMessageThread: function(messageId,callback) {
     var self = this;
 
@@ -1063,63 +967,6 @@ var AppComponent = React.createClass({
     });
   },
 
-  processPatientData: function(data) {
-    if (!(data && data.length >= 0)) {
-      return null;
-    }
-
-    var mostRecentUpload = _.sortBy(_.where(data, {type: 'upload'}), function(d) {
-      return Date.parse(d.time);
-    }).reverse()[0];
-    var timePrefsForTideline;
-    if (!_.isEmpty(mostRecentUpload) && !_.isEmpty(mostRecentUpload.timezone)) {
-      try {
-        sundial.checkTimezoneName(mostRecentUpload.timezone);
-        timePrefsForTideline = {
-          timezoneAware: true,
-          timezoneName: mostRecentUpload.timezone
-        };
-      }
-      catch(err) {
-        this.context.log(err);
-        this.context.log('Upload metadata lacking a valid timezone!', mostRecentUpload);
-      }
-    }
-    var queryParams = this.state.queryParams;
-    // if the user has put a timezone in the query params
-    // it'll be stored already in the state, and we just keep using it
-    if (!_.isEmpty(queryParams.timezone) || _.isEmpty(timePrefsForTideline)) {
-      timePrefsForTideline = this.state.timePrefs;
-    }
-    // but otherwise we use the timezone from the most recent upload metadata obj
-    else {
-      this.setState({
-        timePrefs: timePrefsForTideline
-      });
-      this.context.log('Defaulting to display in timezone of most recent upload at', mostRecentUpload.time, mostRecentUpload.timezone);
-    }
-
-    console.time('Nurseshark Total');
-    var res = nurseShark.processData(data, this.state.bgPrefs.bgUnits);
-    console.timeEnd('Nurseshark Total');
-    console.time('TidelineData Total');
-    var tidelineData = new TidelineData(res.processedData, {
-      timePrefs: this.state.timePrefs,
-      bgUnits: this.state.bgPrefs.bgUnits
-    });
-    console.timeEnd('TidelineData Total');
-
-    window.tidelineData = tidelineData;
-    window.downloadProcessedData = function() {
-      console.save(res.processedData, 'nurseshark-output.json');
-    };
-    window.downloadErroredData = function() {
-      console.save(res.erroredData, 'errored.json');
-    };
-
-    return tidelineData;
-  },
-
   fetchCurrentPatientData: function() {
     var patient = this.state.patient;
 
@@ -1127,25 +974,23 @@ var AppComponent = React.createClass({
       return;
     }
 
-    this.fetchPatientData(patient);
+    this.context.patientStore.fetchPatientData(this, patient);
   },
 
   clearUserData: function() {
-    this.setState({
-      user: null,
-      patients: null,
-      patient: null,
-      patientData: null,
-      showingAcceptTerms: false,
-      showingWelcomeTitle: false,
-      finalizingVerification: false,
-      fetchingUser: true,
-      fetchingPatients: true,
-      fetchingInvites: true,
-      showingWelcomeSetup: false,
-      dismissedBrowserWarning: false,
-      showPatientData: false
-    });
+    this.context.patientStore.resetState();
+
+    this.setState(_.assign({
+        showingAcceptTerms: false,
+        showingWelcomeTitle: false,
+        finalizingVerification: false,
+        fetchingInvites: true,
+        showingWelcomeSetup: false,
+        dismissedBrowserWarning: false,
+        showPatientData: false
+      }, 
+      this.context.patientStore.getState()
+    ));
   },
 
   updateUser: function(formValues) {

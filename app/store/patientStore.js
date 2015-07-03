@@ -17,9 +17,14 @@ var _ = require('lodash');
 var React = require('react');
 var async = require('async');
 var inherits = require('inherits');
+var sundial = require('sundial');
+
+var nurseShark = require('tideline/plugins/nurseshark/');
+var TidelineData = require('tideline/js/tidelinedata');
 
 var userMessages = require('../userMessages');
 var utils = require('../core/utils');
+var queryString = require('../core/querystring');
 var BaseStore = require('./baseStore');
 
 /**
@@ -29,17 +34,61 @@ var BaseStore = require('./baseStore');
  */
 var PatientStore = module.exports = function (api, log) {
   PatientStore.super_.apply(this, [api, log]);
-  this.state = {
+  this.setInitialState();
+};
+inherits(PatientStore, BaseStore);
+
+/**
+ * Set the initial state of the patient store
+ */
+PatientStore.prototype.setInitialState = function() {
+  var queryParams = queryString.parseTypes(window.location.search);
+  var timePrefs = {
+    timezoneAware: false,
+    timezoneName: null
+  };
+  if (!_.isEmpty(queryParams.timezone)) {
+    var queryTimezone = queryParams.timezone.replace('-', '/');
+    try {
+      sundial.checkTimezoneName(queryTimezone);
+      timePrefs.timezoneAware = true;
+      timePrefs.timezoneName = queryTimezone;
+      this.log('Viewing data in timezone-aware mode with', queryTimezone, 'as the selected timezone.');
+    }
+    catch(err) {
+      this.log(new Error('Invalid timezone name in query parameter. (Try capitalizing properly.)'));
+    }
+  }
+  var bgPrefs = {
+    bgUnits: 'mg/dL'
+  };
+  if (!_.isEmpty(queryParams.units)) {
+    var queryUnits = queryParams.units.toLowerCase();
+    if (queryUnits === 'mmoll') {
+      bgPrefs.bgUnits = 'mmol/L';
+    }
+  }
+
+  this.state = { 
+    bgPrefs: bgPrefs,
+    timePrefs: timePrefs,
+    queryParams: queryParams
+  };
+  this.resetState();
+};
+
+PatientStore.prototype.resetState = function() {
+  this.state = _.assign(this.state, { 
     user: null,
     fetchingUser: true,
     patient: null,
     patients: null,
     fetchPatient: true,
-    fetchingPatients: true
-  };
+    fetchingPatients: true,
+    patientData: null,
+    fetchingPatientData: true
+  });
 };
-inherits(PatientStore, BaseStore);
-
 
 /**
  * Go and fetch patients and update state of store and component
@@ -158,14 +207,14 @@ PatientStore.prototype.fetchPatientData = function(component, patient) {
     var patientData = results.patientData || [];
     var notes = results.teamNotes || [];
 
-    this.log('Patient device data count', patientData.length);
-    this.log('Team notes count', notes.length);
+    self.log('Patient device data count', patientData.length);
+    self.log('Team notes count', notes.length);
 
     var combinedData = patientData.concat(notes);
     window.downloadInputData = function() {
       console.save(combinedData, 'blip-input.json');
     };
-    patientData = self.processPatientData(combinedData);
+    patientData = self.processPatientData(component, combinedData);
     
     // NOTE: intentional use of _.clone instead of _.cloneDeep
     // we only need a shallow clone at the top level of the patientId keys
@@ -183,4 +232,62 @@ PatientStore.prototype.fetchPatientData = function(component, patient) {
       fetchingPatientData: false
     });
   });
+};
+
+PatientStore.prototype.processPatientData = function(component, data) {
+  if (!(data && data.length >= 0)) {
+    return null;
+  }
+
+  var mostRecentUpload = _.sortBy(_.where(data, {type: 'upload'}), function(d) {
+    return Date.parse(d.time);
+  }).reverse()[0];
+
+  var timePrefsForTideline;
+  if (!_.isEmpty(mostRecentUpload) && !_.isEmpty(mostRecentUpload.timezone)) {
+    try {
+      sundial.checkTimezoneName(mostRecentUpload.timezone);
+      timePrefsForTideline = {
+        timezoneAware: true,
+        timezoneName: mostRecentUpload.timezone
+      };
+    }
+    catch(err) {
+      this.log(err);
+      this.log('Upload metadata lacking a valid timezone!', mostRecentUpload);
+    }
+  }
+  var queryParams = this.state.queryParams;
+  // if the user has put a timezone in the query params
+  // it'll be stored already in the state, and we just keep using it
+  if (!_.isEmpty(queryParams.timezone) || _.isEmpty(timePrefsForTideline)) {
+    timePrefsForTideline = this.state.timePrefs;
+  }
+  // but otherwise we use the timezone from the most recent upload metadata obj
+  else {
+    this.setState(component, {
+      timePrefs: timePrefsForTideline
+    });
+    this.log('Defaulting to display in timezone of most recent upload at', mostRecentUpload.time, mostRecentUpload.timezone);
+  }
+
+  console.time('Nurseshark Total');
+  var res = nurseShark.processData(data, this.state.bgPrefs.bgUnits);
+  console.timeEnd('Nurseshark Total');
+  console.time('TidelineData Total');
+  var tidelineData = new TidelineData(res.processedData, {
+    timePrefs: this.state.timePrefs,
+    bgUnits: this.state.bgPrefs.bgUnits
+  });
+  console.timeEnd('TidelineData Total');
+
+  window.tidelineData = tidelineData;
+  window.downloadProcessedData = function() {
+    console.save(res.processedData, 'nurseshark-output.json');
+  };
+  window.downloadErroredData = function() {
+    console.save(res.erroredData, 'errored.json');
+  };
+
+  return tidelineData;
 };

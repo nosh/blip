@@ -30,7 +30,17 @@ describe('App', function () {
       patient: null,
       patients: null,
       fetchPatient: true,
-      fetchingPatients: true
+      fetchingPatients: true,
+      patientData: null,
+      fetchingPatientData: true,
+      queryParams: {},
+      bgPrefs: {
+        bgUnits: 'mg/dL'
+      },
+      timePrefs: {
+        timezoneAware: false,
+        timezoneName: null
+      }
     })
   };
 
