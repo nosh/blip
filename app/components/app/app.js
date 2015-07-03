@@ -65,6 +65,7 @@ var AppComponent = React.createClass({
     log: React.PropTypes.func.isRequired,
     api: React.PropTypes.object.isRequired,
     patientStore: React.PropTypes.object.isRequired,
+    inviteStore: React.PropTypes.object.isRequired,
     router: React.PropTypes.object.isRequired,
     personUtils: React.PropTypes.object.isRequired,
     trackMetric: React.PropTypes.func.isRequired,
@@ -102,10 +103,6 @@ var AppComponent = React.createClass({
       notification: null,
       page: null,
       loggingOut: false,
-      invites: null,
-      fetchingInvites: true,
-      pendingInvites:null,
-      fetchingPendingInvites: true,
       bgPrefs: bgPrefs,
       timePrefs: timePrefs,
       patientData: null,
@@ -121,7 +118,11 @@ var AppComponent = React.createClass({
       queryParams: queryParams
     };
 
-    return _.assign(initialState, this.context.patientStore.getState());
+    return _.assign(
+      initialState, 
+      this.context.patientStore.getState(), 
+      this.context.inviteStore.getState()
+    );
   },
 
   doOauthLogin:function(accessToken){
@@ -467,7 +468,7 @@ var AppComponent = React.createClass({
     this.setState({showPatientData: showPatientData});
     this.renderPage = this.renderPatients;
     this.setState({page: 'patients'});
-    this.fetchInvites();
+    this.context.inviteStore.fetchInvites(this);
     this.context.patientStore.fetchPatients(this);
     this.context.trackMetric('Viewed Care Team List');
   },
@@ -653,7 +654,7 @@ var AppComponent = React.createClass({
       if (cb) {
         cb(null, invitation);
       }
-      self.fetchPendingInvites();
+      self.context.inviteStore.fetchPendingInvites(self);
     });
   },
   handleCancelInvite: function(email, cb) {
@@ -675,7 +676,7 @@ var AppComponent = React.createClass({
       if (cb) {
         cb();
       }
-      self.fetchPendingInvites();
+      self.context.inviteStore.fetchPendingInvites(self);
     });
   },
   showPatient: function(patientId) {
@@ -688,7 +689,7 @@ var AppComponent = React.createClass({
       // (important to have this on next render)
       fetchingPatient: true
     });
-    this.fetchPendingInvites();
+    this.context.inviteStore.fetchPendingInvites(this);
     this.context.patientStore.fetchPatient(this, patientId,function(err,patient){
       return;
     });
@@ -704,7 +705,7 @@ var AppComponent = React.createClass({
       // (important to have this on next render)
       fetchingPatient: true
     });
-    this.fetchPendingInvites();
+    this.context.inviteStore.fetchPendingInvites(this);
     this.context.patientStore.fetchPatient(this, patientId,function(err,patient){
       return;
     });
@@ -979,57 +980,6 @@ var AppComponent = React.createClass({
 
   closeNotification: function() {
     this.setState({notification: null});
-  },
-
-  fetchPendingInvites: function(cb) {
-    var self = this;
-
-    self.setState({fetchingPendingInvites: true});
-
-    self.context.api.invitation.getSent(function(err, invites) {
-      if (err) {
-        self.setState({
-          fetchingPendingInvites: false
-        });
-
-        if (cb) {
-          cb(err);
-        }
-
-        return self.handleApiError(err, usrMessages.ERR_FETCHING_PENDING_INVITES, utils.buildExceptionDetails());
-      }
-
-      self.setState({
-        pendingInvites: invites,
-        fetchingPendingInvites: false
-      });
-
-      if (cb) {
-        cb();
-      }
-    });
-  },
-
-  fetchInvites: function() {
-    var self = this;
-
-    self.setState({fetchingInvites: true});
-
-    self.context.api.invitation.getReceived(function(err, invites) {
-      if (err) {
-
-        self.setState({
-          fetchingInvites: false
-        });
-
-        return self.handleApiError(err, usrMessages.ERR_FETCHING_INVITES, utils.buildExceptionDetails());
-      }
-
-      self.setState({
-        invites: invites,
-        fetchingInvites: false
-      });
-    });
   },
 
   fetchPatientData: function(patient) {

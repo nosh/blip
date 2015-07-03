@@ -33,11 +33,21 @@ describe('App', function () {
       fetchingPatients: true
     })
   };
+
+  var inviteStore = {
+    getState: sinon.stub().returns({
+      invites: null,
+      fetchingInvites: true,
+      pendingInvites:null,
+      fetchingPendingInvites: true
+    })
+  };
   var context = {
     log: sinon.stub(),
     api: mock.patchApi(api),
     personUtils: personUtils,
     patientStore: patientStore,
+    inviteStore: inviteStore,
     router: router,
     DEBUG: false,
     trackMetric: sinon.stub()

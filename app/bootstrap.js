@@ -27,7 +27,8 @@ var queryString = require('./core/querystring');
 var detectTouchScreen = require('./core/notouch');
 
 var AppComponent = require('./components/app');
-var PatientStore = require('./store/patient');
+var PatientStore = require('./store/patientStore');
+var InviteStore = require('./store/inviteStore');
 
 // For React developer tools
 window.React = React;
@@ -42,6 +43,7 @@ var appContext = {
   api: api,
   personUtils: personUtils,
   patientStore: new PatientStore(api, bows('PatientStore')),
+  inviteStore: new InviteStore(api, bows('InviteStore')),
   router: router,
   DEBUG: !!(window.localStorage && window.localStorage.debug)
 };
@@ -94,6 +96,7 @@ var Bootstrap = React.createClass({
     log: React.PropTypes.func.isRequired,
     api: React.PropTypes.object.isRequired,
     patientStore: React.PropTypes.object.isRequired,
+    inviteStore: React.PropTypes.object.isRequired,
     router: React.PropTypes.object.isRequired,
     personUtils: React.PropTypes.object.isRequired,
     trackMetric: React.PropTypes.func.isRequired,
@@ -104,6 +107,7 @@ var Bootstrap = React.createClass({
       log: appContext.log,
       api: appContext.api,
       patientStore: appContext.patientStore,
+      inviteStore: appContext.inviteStore,
       router: appContext.router,
       personUtils: appContext.personUtils,
       trackMetric: appContext.trackMetric,

@@ -13,17 +13,22 @@
  * You should have received a copy of the License along with this program; if
  * not, you can obtain one from Tidepool Project at tidepool.org.
  */
-var React = require('react');
 var _ = require('lodash');
+var React = require('react');
+var async = require('async');
+var inherits = require('inherits');
+
 var userMessages = require('../userMessages');
 var utils = require('../core/utils');
+var BaseStore = require('./baseStore');
 
 /**
  * @constructor
  * @param {Object} api API wrapper
+ * @param {Object} log logger
  */
 var PatientStore = module.exports = function (api, log) {
-  this.api = api;
+  PatientStore.super_.apply(this, [api, log]);
   this.state = {
     user: null,
     fetchingUser: true,
@@ -33,26 +38,8 @@ var PatientStore = module.exports = function (api, log) {
     fetchingPatients: true
   };
 };
+inherits(PatientStore, BaseStore);
 
-/**
- * Get the current state of the store
- * 
- * @return {Object}
- */
-PatientStore.prototype.getState = function() {
-  return this.state;
-};
-
-/**
- * Set the state of the store and the supplied component's state too
- * 
- * @param {ReactComponent} component
- * @param {Object} state changes to apply to state
- */
-PatientStore.prototype.setState = function(component, state) {
-  this.state = _.assign(this.state, state);
-  component.setState(state);
-};
 
 /**
  * Go and fetch patients and update state of store and component
@@ -134,5 +121,66 @@ PatientStore.prototype.fetchPatient = function(component, patientId, callback) {
     if (typeof callback === 'function') {
       callback(null, patient);
     }
+  });
+};
+
+PatientStore.prototype.fetchPatientData = function(component, patient) {
+  var self = this;
+
+  var patientId = patient.userid;
+
+  self.setState(component, {fetchingPatientData: true});
+
+  var loadPatientData = function(cb) {
+    self.api.patientData.get(patientId, cb);
+  };
+
+  var loadTeamNotes = function(cb) {
+    self.api.team.getNotes(patientId, cb);
+  };
+
+  async.parallel({
+    patientData: loadPatientData,
+    teamNotes: loadTeamNotes
+  },
+  function(err, results) {
+    if (err) {
+      self.setState(component, {fetchingPatientData: false});
+      // Patient with id not found, cary on
+      if (err.status === 404) {
+        this.log('No data found for patient '+patientId);
+        return;
+      }
+
+      return component.handleApiError(err, userMessages.ERR_FETCHING_PATIENT_DATA+patientId, utils.buildExceptionDetails());
+    }
+
+    var patientData = results.patientData || [];
+    var notes = results.teamNotes || [];
+
+    this.log('Patient device data count', patientData.length);
+    this.log('Team notes count', notes.length);
+
+    var combinedData = patientData.concat(notes);
+    window.downloadInputData = function() {
+      console.save(combinedData, 'blip-input.json');
+    };
+    patientData = self.processPatientData(combinedData);
+    
+    // NOTE: intentional use of _.clone instead of _.cloneDeep
+    // we only need a shallow clone at the top level of the patientId keys
+    // and the _.cloneDeep I had originally would hang the browser for *seconds*
+    // when there was actually something in this.state.patientData
+    var allPatientsData = _.clone(self.state.patientData) || {};
+    allPatientsData[patientId] = patientData;
+
+    self.setState(component, {
+      bgPrefs: {
+        bgClasses: patientData.bgClasses,
+        bgUnits: patientData.bgUnits
+      },
+      patientData: allPatientsData,
+      fetchingPatientData: false
+    });
   });
 };
