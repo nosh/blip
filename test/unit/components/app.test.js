@@ -20,6 +20,8 @@ describe('App', function () {
   // We must remember to require the base module when mocking dependencies,
   // otherwise dependencies mocked will be bound to the wrong scope!
   var App = rewire('../../../app/components/app/app.js');
+  router.log = sinon.stub();
+  api.log = sinon.stub();
 
   var patientStore = {
     getState: sinon.stub().returns({
@@ -70,8 +72,11 @@ describe('App', function () {
       });
     });
 
-    it.skip('bgUnits should be mg/dL', function() {
-
+    it('bgUnits should be mg/dL', function() {
+      React.withContext(context, function() {
+        var elem = TestUtils.renderIntoDocument(<App/>);
+        expect(elem.state.bgPrefs.bgUnits).to.equal('mg/dL');
+      });
     });
 
     it('should render login form', function () {
