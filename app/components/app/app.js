@@ -450,10 +450,10 @@ var AppComponent = React.createClass({
         fetchingInvites={this.state.fetchingInvites}
         showingWelcomeTitle={this.state.showingWelcomeTitle}
         showingWelcomeSetup={this.state.showingWelcomeSetup}
-        onHideWelcomeSetup={this.handleHideWelcomeSetup}
+        onHideWelcomeSetup={this.context.inviteStore.handleHideWelcomeSetup}
         trackMetric={this.context.trackMetric}
         onAcceptInvitation={this.handleAcceptInvitation}
-        onDismissInvitation={this.handleDismissInvitation}
+        onDismissInvitation={this.context.inviteStore.handleDismissInvitation}
         onRemovePatient={this.handleRemovePatient}/>;
     /* jshint ignore:end */
 
@@ -499,31 +499,6 @@ var AppComponent = React.createClass({
     }
 
     return (patients);
-  },
-  handleHideWelcomeSetup: function(options) {
-    if (options && options.route) {
-      this.context.router.setRoute(options.route);
-    }
-    this.setState({showingWelcomeSetup: false});
-  },
-  handleDismissInvitation: function(invitation) {
-    var self = this;
-
-    self.setState({
-      showingWelcomeSetup: false,
-      invites: _.filter(self.state.invites, function(e){
-        return e.key !== invitation.key;
-      })
-    });
-
-    self.context.api.invitation.dismiss(invitation.key, invitation.creator.userid, function(err) {
-      if(err) {
-        self.setState({
-          invites: self.state.invites.concat(invitation)
-        });
-       return self.handleApiError(err, usrMessages.ERR_DISMISSING_INVITE, utils.buildExceptionDetails());
-      }
-    });
   },
   handleAcceptInvitation: function(invitation) {
     var invites = _.cloneDeep(this.state.invites);

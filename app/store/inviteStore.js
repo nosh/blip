@@ -13,6 +13,7 @@
  * You should have received a copy of the License along with this program; if
  * not, you can obtain one from Tidepool Project at tidepool.org.
  */
+var _ = require('lodash');
 var React = require('react');
 var inherits = require('inherits');
 
@@ -98,4 +99,31 @@ InviteStore.prototype.fetchPendingInvites = function(component, cb) {
       cb();
     }
   });
+};
+
+InviteStore.prototype.handleDismissInvitation = function(component, invitation) {
+  var self = this;
+
+  self.setState(component, {
+    showingWelcomeSetup: false,
+    invites: _.filter(self.state.invites, function(e){
+      return e.key !== invitation.key;
+    })
+  });
+
+  self.api.invitation.dismiss(invitation.key, invitation.creator.userid, function(err) {
+    if(err) {
+      self.setState(component, {
+        invites: self.state.invites.concat(invitation)
+      });
+     return component.handleApiError(err, userMessages.ERR_DISMISSING_INVITE, utils.buildExceptionDetails());
+    }
+  });
+};
+
+InviteStore.prototype.handleHideWelcomeSetup = function(component, options) {
+  if (options && options.route) {
+    this.context.router.setRoute(options.route);
+  }
+  this.setState(component, {showingWelcomeSetup: false});
 };
