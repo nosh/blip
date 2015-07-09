@@ -16,7 +16,7 @@
 window.onerror = require('./onerror');
 window.config = require('../config.app.js');
 
-var bootstrap = window.bootstrap = require('./bootstrap');
+var bootstrap = window.app = require('./bootstrap');
 
 var mock = require('../mock');
 bootstrap.useMock(mock);

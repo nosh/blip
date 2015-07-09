@@ -16,6 +16,6 @@
 window.onerror = require('./onerror');
 // NOTE: `window.config` is bundled separately
 
-var bootstrap = window.bootstrap = require('./bootstrap');
+var bootstrap = window.app = require('./bootstrap');
 
 bootstrap.start();
