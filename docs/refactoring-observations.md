@@ -29,6 +29,8 @@ Logic for handling responses to events could be stored in one location, per doma
  - handlers for all routing events
  - handlers for all auth events
 
+We have the choice of the choice of putting handlers, and message dispatching inside child components, rather than in controller view and passing down as a prop.
+
 The main issue with this approach is that the current implementation is vastly different and does not follow similar modelling principles. Some components would have to be re-written.
 
 
