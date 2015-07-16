@@ -71,8 +71,25 @@ var UserStore = module.exports = _.assign({}, EventEmitter.prototype, {
 });
 
 UserStore.dispatchToken = AppDispatcher.register(function(payload) {
-  var action = payload.action;
+  if (payload.source === 'VIEW_ACTION') {
+    processViewAction(payload.action);
+  } else {
+    processServerAction(payload.action);
+  }
+});
 
+function processViewAction(action) {
+  switch(action.type) {
+    case AppConstants.ActionTypes.User.LOGIN:
+      console.log('Login Attempt', action);
+      UserStore.emitChange();
+      break;
+  }
+
+  return true;
+}
+
+function processServerAction(action) {
   switch(action.type) {
     case AppConstants.ActionTypes.User.SET:
       _setUser(action.user);
@@ -81,4 +98,4 @@ UserStore.dispatchToken = AppDispatcher.register(function(payload) {
   }
 
   return true;
-});
+}

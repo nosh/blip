@@ -22,6 +22,9 @@ var config = require('../../config');
 var routeMap = require('../../routemap');
 var utils = require('../../core/utils');
 
+// Dispatcher for Flux Architecture
+var UserActions = require('../../actions/UserActions');
+
 // Stores
 var UserStore = require('../../stores/UserStore');
 var InvitationStore = require('../../stores/InvitationStore');
@@ -64,13 +67,10 @@ require('../../../favicon.ico');
  */
 function getAppState() {
   var state = {
-    page: null, // we change this any time the url changes to enforce a redraw
     userState: UserStore.getData(),
     invitationState: InvitationStore.getData(),
     patientState: PatientStore.getData(),
     patientDataState: PatientDataStore.getData(),
-    showingAcceptTerms: false,
-    dismissedBrowserWarning: false
   };
 
   console.log('State', state);
@@ -96,7 +96,11 @@ var AppComponent = module.exports = React.createClass({
    * @return {Object}
    */
   getInitialState: function() {
-    return getAppState();
+    return _.assign({
+      page: null,
+      showingAcceptTerms: false,
+      dismissedBrowserWarning: false,
+    }, getAppState());
   },
 
   /**
@@ -266,7 +270,7 @@ var AppComponent = module.exports = React.createClass({
     return (
       /* jshint ignore:start */
       <Login
-        onSubmit={function() {}}
+        onSubmit={UserActions.login}
         seedEmail={'gordonmdent@gmail.com'}
         isInvite={false}
         onSubmitSuccess={function() {}}
@@ -275,6 +279,12 @@ var AppComponent = module.exports = React.createClass({
       /* jshint ignore:end */
     );
   },
+
+/**
+ * Routing functions - all functions prefixed with show* are 
+ * associated with the router and handle moving to a new
+ * page in the application
+ */
 
   redirectToDefaultRoute: function() {
     this.showPatients(true);
@@ -326,9 +336,16 @@ var AppComponent = module.exports = React.createClass({
     this.context.log('Show Confirm Password Reset');
   },
 
+/**
+ * Server Handler functions
+ */
+
   handleExternalPasswordUpdate: function() {
     this.context.log('Handle External Password Update');
   },
+
+
+
 
   /**
    * Update view state when change event is received
