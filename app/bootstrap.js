@@ -26,7 +26,7 @@ var personUtils = require('./core/personutils');
 var queryString = require('./core/querystring');
 var detectTouchScreen = require('./core/notouch');
 
-var AppComponent = require('./components/app');
+var AppComponent = require('./components/app/newapp');
 
 // For React developer tools
 window.React = React;
@@ -64,6 +64,7 @@ appContext.init = function(callback) {
   function initNoTouch() {
     detectTouchScreen();
     initMock();
+    initApi();
   }
 
   function initMock() {
@@ -77,7 +78,6 @@ appContext.init = function(callback) {
       self.mock.init(params);
       self.log('Mock services initialized with params', params);
     }
-    initApi();
   }
 
   function initApi() {
